@@ -9,6 +9,7 @@ COPY . /app
 RUN set -eux; \
     built_any=0; \
     for d in $(find . -maxdepth 1 -type d -name 'app_*'); do \
+        echo 
         if [ -d "$d/.nuxt" ]; then \
             echo "📦 Found Nuxt app (has .nuxt): $d"; \
             cd "$d"; \

@@ -2,17 +2,13 @@
 FROM node:22-alpine AS build
 
 ARG NuxtAppRoot="app_myFrontendNuxtVue_01"
-
 WORKDIR /app
 
-COPY ${NuxtAppRoot}/package.json ./
-
+COPY ${NuxtAppRoot}/package.json ${NuxtAppRoot}/pnpm-lock.yaml* ${NuxtAppRoot}/package-lock.json* ./
 RUN npm i
 
-COPY ${NuxtAppRoot} ./
-
-RUN npm run build
-
+COPY ${NuxtAppRoot}/ ./
+RUN npm run generate	# => .output/public
 
 # ---------- STAGE 2: runtime Django ----------
 FROM python:3.12-slim AS django

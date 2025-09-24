@@ -1,5 +1,7 @@
+# tabs = \t
 from pathlib import Path
 import os
+import json
 
 # --- Base ---
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -26,6 +28,8 @@ MIDDLEWARE = [
 	'django.contrib.auth.middleware.AuthenticationMiddleware',
 	'django.contrib.messages.middleware.MessageMiddleware',
 	'django.middleware.clickjacking.XFrameOptionsMiddleware',
+	# Production (optionnel) :
+	# 'whitenoise.middleware.WhiteNoiseMiddleware',
 ]
 
 ROOT_URLCONF = 'mysite.urls'
@@ -33,7 +37,7 @@ ROOT_URLCONF = 'mysite.urls'
 TEMPLATES = [
 	{
 		'BACKEND': 'django.template.backends.django.DjangoTemplates',
-		'DIRS': [BASE_DIR / 'templates'],  # optionnel mais pratique
+		'DIRS': [BASE_DIR / 'templates'],
 		'APP_DIRS': True,
 		'OPTIONS': {
 			'context_processors': [
@@ -71,19 +75,22 @@ USE_TZ = True
 
 # --- Staticfiles ---
 STATIC_URL = '/static/'
-STATIC_ROOT = BASE_DIR / 'staticfiles'      # utile en prod (collectstatic)
-STATICFILES_DIRS: list[str | os.PathLike] = [BASE_DIR / 'static']  # répertoire statique "app" (optionnel)
+STATIC_ROOT = BASE_DIR / 'staticfiles'
 
-# Découverte auto des builds Nuxt (.output/public) dans tous les app_* à la racine du repo ou sous ./mysite
+# évite le warning si "static/" n'existe pas
+STATICFILES_DIRS: list[str | os.PathLike] = []
+if (BASE_DIR / 'static').exists():
+	STATICFILES_DIRS.append(BASE_DIR / 'static')
+
+# --- Détection Nuxt (SPA/SSG) ---
 def _discover_nuxt_public_dirs() -> tuple[list[str], list[dict]]:
-	apps_public = []
-	apps_detected = []
+	apps_public: list[str] = []
+	apps_detected: list[dict] = []
 
-	# on cherche à la racine du repo (parent de BASE_DIR) ET dans BASE_DIR (si des app_* sont là)
+	# 1) Détection automatique dans les dossiers app_* (monorepo)
 	search_roots = [os.path.abspath(BASE_DIR.parent), str(BASE_DIR)]
-
 	for root in search_roots:
-		if not os.path.isdir(root): 
+		if not os.path.isdir(root):
 			continue
 		for entry in os.listdir(root):
 			if not entry.startswith("app_"):
@@ -92,28 +99,87 @@ def _discover_nuxt_public_dirs() -> tuple[list[str], list[dict]]:
 			if not os.path.isdir(app_dir):
 				continue
 
-			# Critères "Nuxt" : présence d'un dossier .nuxt (ta contrainte) ET d'un build disponible
-			nuxt_marker = os.path.isdir(os.path.join(app_dir, ".nuxt"))
+			# Critère simple : build présent => .output/public/index.html
 			public_dir = os.path.join(app_dir, ".output", "public")
-			is_public = os.path.isdir(public_dir)
+			is_public = os.path.isfile(os.path.join(public_dir, "index.html"))
 
-			app_type = "nuxt" if nuxt_marker else "django"
-			apps_detected.append({
-				"name": entry,
-				"path": app_dir,
-				"type": app_type,
-				"public": public_dir if is_public else None,
-				"nuxt_marker": nuxt_marker,
-			})
-
-			# On n'ajoute aux statiques que si le build Nuxt existe réellement
-			if app_type == "nuxt" and is_public:
+			# n'ajoute QUE si c'est vraiment un Nuxt buildé
+			if is_public:
+				apps_detected.append({
+					"name": entry,
+					"path": app_dir,
+					"type": "nuxt",
+					"public": public_dir,
+				})
 				apps_public.append(public_dir)
+
+	# 2) Manifest optionnel (si écrit par le Dockerfile de build)
+	manifest_path = BASE_DIR / "nuxt_apps.json"
+	if manifest_path.exists():
+		try:
+			data = json.loads(manifest_path.read_text())
+			for app in data:
+				raw_public = Path(app.get("public", ""))
+				name = app.get("name", "nuxt-app")
+
+				# Stratégie robuste : si le chemin du manifest n'existe pas en runtime,
+				# tente les emplacements classiques copiés par l'image : /app/public puis /app/frontend
+				candidates = [raw_public, BASE_DIR / "public", BASE_DIR / "frontend"]
+				for cand in candidates:
+					if cand and (cand / "index.html").exists():
+						pp = str(cand.resolve())
+						apps_public.append(pp)
+						apps_detected.append({
+							"name": name,
+							"path": pp,
+							"type": "nuxt",
+							"public": pp,
+						})
+						break
+		except Exception:
+			pass
 
 	return apps_public, apps_detected
 
 _PUBLIC_DIRS, APPS_DETECTED = _discover_nuxt_public_dirs()
+
+# 3) Fallbacks runtime : accepte /app/public et /app/frontend
+def _add_runtime_public(dir_name: str, default_name: str):
+	p = (BASE_DIR / dir_name).resolve()
+	if (p / "index.html").exists():
+		pp = str(p)
+		_PUBLIC_DIRS.append(pp)
+		APPS_DETECTED.append({
+			"name": os.getenv("NUXT_APP_NAME", default_name),
+			"path": pp,
+			"type": "nuxt",
+			"public": pp,
+		})
+
+_add_runtime_public("public",   "app_myFrontendNuxtVue_01")   # ← ton cas actuel
+_add_runtime_public("frontend", "app_myFrontendNuxtVue_01")
+
+# Déduplication (_PUBLIC_DIRS & APPS_DETECTED)
+_PUBLIC_DIRS = []
+APPS_DETECTED = []
+
+public_dir = (BASE_DIR / "public")
+if (public_dir / "index.html").exists():
+	_PUBLIC_DIRS.append(str(public_dir.resolve()))
+	APPS_DETECTED.append({
+		"name": "app_myFrontendNuxtVue_01",
+		"type": "nuxt",
+		"public": str(public_dir.resolve()),
+	})
+
+# Étendre les statiques avec les builds Nuxt détectés
 STATICFILES_DIRS.extend(_PUBLIC_DIRS)
 
-# APPS_DETECTED est maintenant accessible partout:
-# from django.conf import settings; settings.APPS_DETECTED
+# --- WhiteNoise (prod) ---
+# STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
+
+# --- Logs de démarrage (dev) ---
+if DEBUG and os.environ.get("RUN_MAIN") == "true":
+	print("\n=== Applications détectées ===")
+	for app in APPS_DETECTED:
+		print(f"[NUXT]  {app.get('name')}  -> {app.get('public')}")

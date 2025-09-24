@@ -1,38 +1,51 @@
-"""
-URL configuration for mysite project.
-
-The `urlpatterns` list routes URLs to views. For more information please see:
-    https://docs.djangoproject.com/en/dev/topics/http/urls/
-Examples:
-Function views
-    1. Add an import:  from my_app import views
-    2. Add a URL to urlpatterns:  path('', views.home, name='home')
-Class-based views
-    1. Add an import:  from other_app.views import Home
-    2. Add a URL to urlpatterns:  path('', Home.as_view(), name='home')
-Including another URLconf
-    1. Import the include() function: from django.urls import include, path
-    2. Add a URL to urlpatterns:  path('blog/', include('blog.urls'))
-"""
-# mysite/mysite/urls.py
+# tabs = \t
 from django.contrib import admin
 from django.urls import path, re_path
-from django.http import FileResponse, Http404
+from django.views.static import serve as static_serve
+from django.http import FileResponse, Http404, HttpResponse
 from django.conf import settings
-import os
+from pathlib import Path
+import re as _re
+
+ASSET_DIRS = ("_nuxt", "assets", "images", "icons", "fonts", "favicon.ico", "robots.txt", "sitemap.xml")
 
 def serve_nuxt(public_dir: str):
-	def _view(request, path=''):
-		index = os.path.join(public_dir, "index.html")
-		if not os.path.exists(index):
+	def _view(_req):
+		index = Path(public_dir) / "index.html"
+		if not index.exists():
 			raise Http404("Nuxt index.html not found")
 		return FileResponse(open(index, "rb"))
 	return _view
 
-urlpatterns = [ path("admin/", admin.site.urls) ]
+def django_home(_req):
+	return HttpResponse("<h1>Django OK</h1><p>Accueil Django sur /</p>")
 
+urlpatterns = [
+	path("", django_home, name="home"),
+	path("admin/", admin.site.urls),
+]
+
+# montera l'app sous /app_myFrontendNuxtVue_01/
 for app in getattr(settings, "APPS_DETECTED", []):
 	if app.get("type") == "nuxt" and app.get("public"):
-		name = app["name"]
-		public_dir = app["public"]
-		urlpatterns.append(re_path(rf"^{name}(/.*)?$", serve_nuxt(public_dir)))
+		name = "app_myFrontendNuxtVue_01"
+		public = app["public"]
+		name_escaped = _re.escape(name)
+		assets_alt = "|".join(_re.escape(d) for d in ASSET_DIRS)
+
+		# 1) assets: /app_myFrontendNuxtVue_01/_nuxt/*, /assets/*, ...
+		urlpatterns.append(
+			re_path(
+				rf"^{name_escaped}/(?P<path>(?:{assets_alt}).*)$",
+				static_serve,
+				{"document_root": public},
+				name=f"{name}-assets",
+			)
+		)
+		# 2) index
+		urlpatterns.append(re_path(rf"^{name_escaped}/?$", serve_nuxt(public), name=f"{name}-root"))
+		# 3) catch-all SPA (hors assets)
+		urlpatterns.append(
+			re_path(rf"^{name_escaped}/(?!(?:{assets_alt})/).+$", serve_nuxt(public), name=f"{name}-spa")
+		)
+

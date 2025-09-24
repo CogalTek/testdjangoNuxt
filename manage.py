@@ -1,6 +1,5 @@
 import os
 import sys
-from script.getNuxtApp import GetNuxtApp
 
 def main():
 	os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'mysite.settings')
@@ -12,10 +11,6 @@ def main():
 			"available on your PYTHONPATH environment variable? Did you "
 			"forget to activate a virtual environment?"
 		) from exc
-
-	# ta routine de démarrage
-	LISTAPP = GetNuxtApp()
-	LISTAPP.run()
 
 	execute_from_command_line(sys.argv)
 

@@ -14,9 +14,25 @@ Including another URLconf
     1. Import the include() function: from django.urls import include, path
     2. Add a URL to urlpatterns:  path('blog/', include('blog.urls'))
 """
+# mysite/mysite/urls.py
 from django.contrib import admin
-from django.urls import path
+from django.urls import path, re_path
+from django.http import FileResponse, Http404
+from django.conf import settings
+import os
 
-urlpatterns = [
-    path('admin/', admin.site.urls),
-]
+def serve_nuxt(public_dir: str):
+	def _view(request, path=''):
+		index = os.path.join(public_dir, "index.html")
+		if not os.path.exists(index):
+			raise Http404("Nuxt index.html not found")
+		return FileResponse(open(index, "rb"))
+	return _view
+
+urlpatterns = [ path("admin/", admin.site.urls) ]
+
+for app in getattr(settings, "APPS_DETECTED", []):
+	if app.get("type") == "nuxt" and app.get("public"):
+		name = app["name"]
+		public_dir = app["public"]
+		urlpatterns.append(re_path(rf"^{name}(/.*)?$", serve_nuxt(public_dir)))

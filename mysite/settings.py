@@ -143,7 +143,7 @@ def _discover_nuxt_public_dirs() -> tuple[list[str], list[dict]]:
 
 _PUBLIC_DIRS, APPS_DETECTED = _discover_nuxt_public_dirs()
 
-# 3) Fallbacks runtime : accepte /app/public et /app/frontend
+# 3) Fallbacks runtime : accepte /app/public et /app/frontend **en plus**
 def _add_runtime_public(dir_name: str, default_name: str):
 	p = (BASE_DIR / dir_name).resolve()
 	if (p / "index.html").exists():
@@ -156,23 +156,30 @@ def _add_runtime_public(dir_name: str, default_name: str):
 			"public": pp,
 		})
 
-_add_runtime_public("public",   "app_myFrontendNuxtVue_01")   # ← ton cas actuel
+_add_runtime_public("public",   "app_myFrontendNuxtVue_01")
 _add_runtime_public("frontend", "app_myFrontendNuxtVue_01")
 
-# Déduplication (_PUBLIC_DIRS & APPS_DETECTED)
-_PUBLIC_DIRS = []
-APPS_DETECTED = []
+# 4) Déduplication (ne PAS vider les listes)
+def _dedup_public(apps_public: list[str], apps_detected: list[dict]) -> tuple[list[str], list[dict]]:
+	seen_public = set()
+	public_out = []
+	for p in apps_public:
+		if p not in seen_public:
+			seen_public.add(p)
+			public_out.append(p)
 
-public_dir = (BASE_DIR / "public")
-if (public_dir / "index.html").exists():
-	_PUBLIC_DIRS.append(str(public_dir.resolve()))
-	APPS_DETECTED.append({
-		"name": "app_myFrontendNuxtVue_01",
-		"type": "nuxt",
-		"public": str(public_dir.resolve()),
-	})
+	seen_detect = set()
+	detected_out = []
+	for app in apps_detected:
+		pub = app.get("public")
+		if pub and pub not in seen_detect:
+			seen_detect.add(pub)
+			detected_out.append(app)
+	return public_out, detected_out
 
-# Étendre les statiques avec les builds Nuxt détectés
+_PUBLIC_DIRS, APPS_DETECTED = _dedup_public(_PUBLIC_DIRS, APPS_DETECTED)
+
+# 5) Étendre les statiques avec les builds Nuxt détectés
 STATICFILES_DIRS.extend(_PUBLIC_DIRS)
 
 # --- WhiteNoise (prod) ---

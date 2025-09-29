@@ -7,7 +7,7 @@ COPY ${NuxtAppRoot}/package.json ${NuxtAppRoot}/pnpm-lock.yaml* ${NuxtAppRoot}/p
 RUN npm i
 
 COPY ${NuxtAppRoot}/ ./
-RUN npm run generate          # => ./dist
+RUN npm run generate   # => .output/public
 
 # ---------- STAGE 2: runtime Django ----------
 FROM python:3.12-slim AS django
@@ -17,13 +17,12 @@ WORKDIR /app
 RUN apt-get update && apt-get install -y --no-install-recommends curl ca-certificates tini \
  && rm -rf /var/lib/apt/lists/*
 
-# ⬅️ copie Nuxt4
-COPY --from=build /app/dist/ ./public/
+# ⬅️ copie Nuxt SSG
+COPY --from=build /app/.output/public/ ./public/
 
 COPY requirements.txt ./requirements.txt
 RUN pip install --no-cache-dir -r ./requirements.txt
 
 COPY . .
-
 EXPOSE 8000
 CMD ["python","manage.py","runserver","0.0.0.0:8000"]

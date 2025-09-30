@@ -7,7 +7,10 @@
     "dev": "nuxt dev",
     "generate": "nuxt generate",
     "preview": "nuxt preview",
-    "postinstall": "nuxt prepare"
+    "postinstall": "nuxt prepare",
+    "build:ce": "nuxt build -c nuxt.config.ce.ts",
+		"generate:ce": "nuxt generate -c nuxt.config.ce.ts",
+		"postgenerate:ce": "cpy \"dist/nuxt-custom-elements/**\" \"../public/nuxtce\" --parents"
   },
   "dependencies": {
     "nuxt": "^4.1.2",
@@ -16,6 +19,8 @@
   },
   "devDependencies": {
     "@mdi/font": "^7.4.47",
+    "cpy-cli": "^6.0.0",
+    "nuxt-custom-elements": "^2.0.0-beta.32",
     "sass": "^1.93.2",
     "vite-plugin-vuetify": "^2.1.2",
     "vuetify": "^3.10.3"

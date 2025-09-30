@@ -12,5 +12,5 @@ export default defineNuxtConfig({
 	},
 	css: ['vuetify/styles','@mdi/font/css/materialdesignicons.css'],
 	build: { transpile: ['vuetify'] },
-	vite: { plugins: [vuetify()] }
+	vite: { plugins: [vuetify()] },
 })

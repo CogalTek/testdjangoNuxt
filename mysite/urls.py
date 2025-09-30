@@ -4,6 +4,8 @@ from django.urls import path, re_path
 from django.views.static import serve as static_serve
 from django.http import FileResponse, Http404, HttpResponse
 from django.conf import settings
+from django.utils.html import escapejs
+import json
 from pathlib import Path
 import re as _re
 
@@ -18,7 +20,16 @@ def serve_nuxt(public_dir: str):
 	return _view
 
 def django_home(_req):
-	return HttpResponse("<h1>Django OK</h1><p>Accueil Django sur /</p>")
+	props = {"id": 123, "size": "sm"}
+	# turn props into a JSON string safe for an HTML attribute
+	props_attr = escapejs(json.dumps(props))
+	html = (
+		f"<h1>Django OK</h1>"
+		f"<p>Accueil Django sur /</p>"
+		f"<div data-nuxt-component='UserCard' data-props=\"{props_attr}\"></div>"
+		# In DEV, include HMR scripts; in PROD, inject built assets (see below)
+	)
+	return HttpResponse(html)
 
 urlpatterns = [
 	path("", django_home, name="home"),

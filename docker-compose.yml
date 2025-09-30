@@ -5,3 +5,12 @@ services:
     build: .
     ports:
       - "8000:8000"
+  nuxt:
+    build: ./app_myFrontendNuxtVue_01
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=development
+    volumes:
+      - ./app_myFrontendNuxtVue_01:/app
+    command: npx nuxi dev --port 3000 --host 0.0.0.0

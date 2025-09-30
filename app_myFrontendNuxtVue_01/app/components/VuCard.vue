@@ -13,10 +13,10 @@
 </template>
 
 <script setup lang="ts">
-defineProps<{
-	title?: string
-	subtitle?: string
-	cta?: string
-}>()
-defineEmits<{ (e: 'primary'): void }>()
+	defineProps<{
+		title?: string
+		subtitle?: string
+		cta?: string
+	}>()
+	defineEmits<{ (e: 'primary'): void }>()
 </script>

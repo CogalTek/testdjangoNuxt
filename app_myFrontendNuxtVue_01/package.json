@@ -8,9 +8,6 @@
     "generate": "nuxt generate",
     "preview": "nuxt preview",
     "postinstall": "nuxt prepare",
-    "build:ce": "nuxt build -c nuxt.config.ce.ts",
-		"generate:ce": "nuxt generate -c nuxt.config.ce.ts",
-		"postgenerate:ce": "cpy \"dist/nuxt-custom-elements/**\" \"../public/nuxtce\" --parents"
   },
   "dependencies": {
     "nuxt": "^4.1.2",
